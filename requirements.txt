@@ -1,0 +1,23 @@
+# LogDefender dependencies
+# Install with: pip install -r requirements.txt
+
+# Core detection
+psutil==6.1.1
+pynput==1.7.7
+requests==2.32.3
+pyyaml==6.0.2
+python-dotenv==1.0.1
+
+# GUI
+customtkinter==5.2.2
+
+# Dashboard
+streamlit==1.41.1
+pandas==2.2.3
+streamlit-autorefresh==1.0.1
+
+# Build / packaging
+pyinstaller==6.11.1
+
+# Optional — Docker container IP scanning
+# docker==7.1.0

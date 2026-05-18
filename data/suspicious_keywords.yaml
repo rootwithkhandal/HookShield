@@ -1,0 +1,57 @@
+# Suspicious process/command-line keywords used by LogDefender.
+# Add or remove entries to tune detection sensitivity.
+# Lines starting with '#' are comments and are ignored.
+
+keywords:
+  # --- Keylogger-specific ---
+  - keylogger
+  - pynput
+  - hook
+  - keystroke
+  - listener        # fixed typo: was "lisatener"
+  - inputhook
+  - keyhook
+  - cliplogger
+
+  # --- Capture / recording ---
+  - capture
+  - record
+  - intercept
+  - grabber
+  - screenshot
+
+  # --- Credential theft ---
+  - stealer
+  - mimikatz
+  - credsdump
+  - dump
+
+  # --- Remote access / C2 ---
+  - rat
+  - remote
+  - c2
+  - bindshell
+  - reverse_shell
+  - backdoor
+  - beacon
+  - payload
+
+  # --- Injection / persistence ---
+  - inject
+  - dllinject
+  - persistence
+  - taskhide
+  - hidewindow
+  - rootkit
+
+  # --- Malware generic ---
+  - malware
+  - trojan
+  - sniffer
+  - metasploit
+
+  # --- Exfiltration / obfuscation ---
+  - scrape
+  - exfiltrate
+  - obfuscate
+  - cryptor

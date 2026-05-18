@@ -1,0 +1,245 @@
+"""
+LogDefender — main orchestration module.
+
+Provides individual detection functions and a monitor_system() loop.
+"""
+import logging
+import time
+
+from utils.logger import configure_logger
+from utils.config_loader import load_config, load_known_hashes
+from utils.dblogs import insert_log, insert_threat
+from utils.email_sender import send_email
+
+from core.process_detector import detect_suspicious_processes
+from core.file_scanner import scan_files
+from core.keyboard_hook_detector import detect_keyboard_hooks
+from core.remote_connection_detector import detect_remote_connections
+from core.clipboard_monitor import detect_clipboard_access
+from core.startup_scanner import scan_startup_entries
+
+logger = logging.getLogger(__name__)
+
+# Load config once at module level
+_cfg = load_config()
+VIRUS_TOTAL_API_KEY: str = _cfg.get("virus_total_api_key", "")
+KNOWN_HASHES: list = load_known_hashes()
+
+
+# ---------------------------------------------------------------------------
+# Detection helpers
+# ---------------------------------------------------------------------------
+
+def detect_keyloggers() -> list[dict]:
+    """Detect suspicious processes and keyboard hooks."""
+    logger.info("--- Process scan started ---")
+    processes = detect_suspicious_processes()
+
+    if processes:
+        insert_log("WARN", "Suspicious processes detected.", str(processes))
+        insert_threat("process", "HIGH", f"Suspicious processes: {[p['name'] for p in processes]}")
+        _send_process_alert(processes)
+
+    logger.info("--- Keyboard hook check ---")
+    if detect_keyboard_hooks():
+        insert_log("WARN", "Keyboard hook detected.", "N/A")
+        insert_threat("keyboard_hook", "HIGH", "Active keyboard hook detected.")
+        _send_hook_alert(processes)
+
+    return processes
+
+
+def scanning_files(directory_path: str) -> tuple[list[str], str]:
+    """Scan a directory for suspicious files."""
+    logger.info("--- File scan started: %s ---", directory_path)
+    suspicious_files = scan_files(directory_path, KNOWN_HASHES, VIRUS_TOTAL_API_KEY)
+
+    if suspicious_files:
+        logger.warning("Suspicious files detected: %s", suspicious_files)
+        insert_log("WARN", "Suspicious files detected.", str(suspicious_files))
+        insert_threat("file", "HIGH", f"Suspicious files: {suspicious_files}")
+        _send_file_alert(suspicious_files)
+    else:
+        logger.info("No suspicious files found in %s", directory_path)
+
+    return suspicious_files, "Scan Completed"
+
+
+def detect_network(processes: list = None, files: list = None) -> list[dict]:
+    """Detect suspicious remote connections."""
+    logger.info("--- Network connection scan ---")
+    connections = detect_remote_connections()
+
+    if connections:
+        insert_log("WARN", "Suspicious remote connections detected.", str(connections))
+        insert_threat("network", "MEDIUM", f"Suspicious connections: {connections}")
+        _send_network_alert(connections)
+
+    if not (processes or files or connections or detect_keyboard_hooks()):
+        logger.info("No keylogger activity detected.")
+
+    return connections
+
+
+def detect_clipboard() -> list[dict]:
+    """Detect suspicious clipboard access."""
+    logger.info("--- Clipboard monitor check ---")
+    hits = detect_clipboard_access()
+
+    if hits:
+        insert_log("WARN", "Suspicious clipboard access detected.", str(hits))
+        insert_threat("clipboard", "MEDIUM", f"Clipboard access by: {[h['name'] for h in hits]}")
+        _send_clipboard_alert(hits)
+
+    return hits
+
+
+def scan_startup() -> list[dict]:
+    """Scan startup entries for suspicious items."""
+    logger.info("--- Startup entry scan ---")
+    entries = scan_startup_entries()
+
+    if entries:
+        insert_log("WARN", "Suspicious startup entries detected.", str(entries))
+        insert_threat("startup", "HIGH", f"Suspicious startup entries: {entries}")
+        _send_startup_alert(entries)
+
+    return entries
+
+
+def kill_process(pid: int) -> bool:
+    """
+    Terminate a process by PID.
+    Returns True on success, False on failure.
+    """
+    import psutil
+    try:
+        proc = psutil.Process(pid)
+        name = proc.name()
+        proc.terminate()
+        proc.wait(timeout=5)
+        logger.warning("Terminated process: %s (PID %d)", name, pid)
+        insert_log("WARN", f"Process terminated: {name} (PID {pid})", "process_killer")
+        insert_threat("process_kill", "HIGH", f"Process {name} (PID {pid}) was terminated.")
+        return True
+    except psutil.NoSuchProcess:
+        logger.error("Process PID %d not found.", pid)
+        return False
+    except psutil.AccessDenied:
+        logger.error("Access denied terminating PID %d.", pid)
+        return False
+    except psutil.TimeoutExpired:
+        try:
+            psutil.Process(pid).kill()
+            return True
+        except Exception:
+            return False
+
+
+# ---------------------------------------------------------------------------
+# Alert helpers
+# ---------------------------------------------------------------------------
+
+def _send_process_alert(processes: list):
+    subject = "🚨 SCRAMBLE — Suspicious Process Detected"
+    body = (
+        "🚨 Threat Alert: Suspicious Process Detected\n\n"
+        "Details:\n---------\n"
+        f"Processes : {processes}\n"
+        "Action    : Terminate the process and perform a full system scan.\n\n"
+        "This is an automated alert from LogDefender."
+    )
+    send_email(subject=subject, body=body)
+
+
+def _send_hook_alert(processes: list):
+    subject = "🚨 SCRAMBLE — Keyboard Hook Detected"
+    body = (
+        "🚨 Threat Alert: Keyboard Hook Detected\n\n"
+        "Details:\n---------\n"
+        f"Related processes : {processes}\n"
+        "Action            : Terminate the process and perform a full system scan.\n\n"
+        "This is an automated alert from LogDefender."
+    )
+    send_email(subject=subject, body=body)
+
+
+def _send_file_alert(files: list):
+    subject = "🚨 SCRAMBLE — Suspicious File Detected"
+    body = (
+        "🚨 Threat Alert: Suspicious File Detected\n\n"
+        "Details:\n---------\n"
+        f"Files  : {files}\n"
+        "Action : Quarantine or delete the file and perform a full system scan.\n\n"
+        "This is an automated alert from LogDefender."
+    )
+    send_email(subject=subject, body=body)
+
+
+def _send_network_alert(connections: list):
+    subject = "🚨 SCRAMBLE — Suspicious Remote Connection Detected"
+    body = (
+        "🚨 Threat Alert: Suspicious Remote Connection Detected\n\n"
+        "Details:\n---------\n"
+        f"Connections : {connections}\n\n"
+        "This is an automated alert from LogDefender."
+    )
+    send_email(subject=subject, body=body)
+
+
+def _send_clipboard_alert(hits: list):
+    subject = "🚨 SCRAMBLE — Suspicious Clipboard Access Detected"
+    body = (
+        "🚨 Threat Alert: Suspicious Clipboard Access\n\n"
+        "Details:\n---------\n"
+        f"Processes : {hits}\n"
+        "Action    : Investigate and terminate the process if malicious.\n\n"
+        "This is an automated alert from LogDefender."
+    )
+    send_email(subject=subject, body=body)
+
+
+def _send_startup_alert(entries: list):
+    subject = "🚨 SCRAMBLE — Suspicious Startup Entry Detected"
+    body = (
+        "🚨 Threat Alert: Suspicious Startup Entry\n\n"
+        "Details:\n---------\n"
+        f"Entries : {entries}\n"
+        "Action  : Remove the entry and investigate the associated file.\n\n"
+        "This is an automated alert from LogDefender."
+    )
+    send_email(subject=subject, body=body)
+
+
+# ---------------------------------------------------------------------------
+# Monitor loop
+# ---------------------------------------------------------------------------
+
+def monitor_system(directory: str = ".", interval: int = 60):
+    """
+    Continuously run all detection checks.
+
+    :param directory: Directory to scan for suspicious files.
+    :param interval:  Seconds to sleep between scan cycles.
+    """
+    logger.info("LogDefender monitor started. Scan interval: %d s", interval)
+    while True:
+        try:
+            processes = detect_keyloggers()
+            files, _ = scanning_files(directory)
+            detect_network(processes, files)
+            detect_clipboard()
+            scan_startup()
+        except Exception as e:
+            logger.error("Unexpected error in monitor loop: %s", e)
+        time.sleep(interval)
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    configure_logger()
+    logger.info("Starting LogDefender...")
+    monitor_system()

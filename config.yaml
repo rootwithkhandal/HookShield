@@ -1,0 +1,20 @@
+# LogDefender configuration
+#
+# SECURITY NOTE:
+#   Do NOT commit real credentials here.
+#   Prefer setting secrets via environment variables or a .env file:
+#     VIRUS_TOTAL_API_KEY=...
+#     EMAIL_SENDER=...
+#     EMAIL_PASSWORD=...
+#     EMAIL_RECEIVER=...
+#
+#   Values set in environment variables override the values below.
+
+virus_total_api_key: ""   # or set VIRUS_TOTAL_API_KEY env var
+
+url: "https://www.virustotal.com/api/v3/files/"
+
+email:
+  sender: ""      # Gmail address — or set EMAIL_SENDER env var
+  password: ""    # Gmail App Password — or set EMAIL_PASSWORD env var
+  receiver: ""    # Alert recipient — or set EMAIL_RECEIVER env var
