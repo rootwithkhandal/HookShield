@@ -8,4 +8,4 @@ run = "python -m pip install -r requirements.txt"
 run = "python main.py"
 
 [tasks.ui]
-run = "python -m streamlit run web/dashboard.py"
+run = "python web/app.py"

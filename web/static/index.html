@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogDefender Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar glass-panel">
+            <div class="logo">
+                <span class="icon">🛡️</span>
+                <span class="title">LogDefender</span>
+            </div>
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" data-tab="overview">
+                    <span class="icon">📊</span>
+                    <span class="label">Overview</span>
+                </a>
+                <a href="#" class="nav-item" data-tab="detection-logs">
+                    <span class="icon">📋</span>
+                    <span class="label">Detection Logs</span>
+                </a>
+                <a href="#" class="nav-item" data-tab="network-logs">
+                    <span class="icon">🌐</span>
+                    <span class="label">Network Logs</span>
+                </a>
+                <a href="#" class="nav-item" data-tab="threat-history">
+                    <span class="icon">🔴</span>
+                    <span class="label">Threat History</span>
+                </a>
+                <a href="#" class="nav-item" data-tab="memory-logs">
+                    <span class="icon">🧠</span>
+                    <span class="label">Memory Logs</span>
+                </a>
+                <a href="#" class="nav-item" data-tab="settings">
+                    <span class="icon">⚙️</span>
+                    <span class="label">Settings</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="top-header glass-panel">
+                <div class="system-status">
+                    <div class="status-item">
+                        <span class="status-label">CPU</span>
+                        <span class="status-value cyan-glow" id="sys-cpu">--%</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">RAM</span>
+                        <span class="status-value cyan-glow" id="sys-ram">--%</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">UPTIME</span>
+                        <span class="status-value cyan-glow" id="sys-uptime">--h --m</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="dashboard-content">
+                <div id="tab-overview" class="tab-pane active">
+                    <!-- Metrics Row -->
+                    <div class="metrics-row">
+                        <div class="metric-card glass-card">
+                            <span class="metric-title">Total Threats</span>
+                            <span class="metric-value" id="metric-total">--</span>
+                        </div>
+                        <div class="metric-card glass-card">
+                            <span class="metric-title">Unresolved</span>
+                            <span class="metric-value danger-glow" id="metric-unresolved">--</span>
+                        </div>
+                        <div class="metric-card glass-card">
+                            <span class="metric-title">Active Processes</span>
+                            <span class="metric-value purple-glow" id="metric-processes">--</span>
+                        </div>
+                        <div class="metric-card glass-card">
+                            <span class="metric-title">Scanned Files</span>
+                            <span class="metric-value" id="metric-scanned">--</span>
+                        </div>
+                        <div class="metric-card glass-card">
+                            <span class="metric-title">Network Connections</span>
+                            <span class="metric-value" id="metric-network">--</span>
+                        </div>
+                    </div>
+
+                    <!-- Charts Section -->
+                    <div class="charts-section">
+                        <div class="chart-container glass-card">
+                            <h3 class="section-title">Threats by Type</h3>
+                            <div class="chart-wrapper">
+                                <canvas id="threatsTypeChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-container glass-card">
+                            <h3 class="section-title">Log Volume Over Time</h3>
+                            <div class="chart-wrapper">
+                                <canvas id="logVolumeChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Detection Logs -->
+                    <div class="table-container glass-card">
+                        <h3 class="section-title">Recent Detection Logs</h3>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Level</th>
+                                        <th>Source</th>
+                                        <th>Message</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="logs-table-body">
+                                    <tr>
+                                        <td colspan="4" class="text-center">Loading logs...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-detection-logs" class="tab-pane" style="display: none;">
+                    <div class="glass-card table-container">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border);">
+                            <h3 class="section-title" style="border-bottom: none;">Full Detection Logs</h3>
+                            <a href="/api/export/logs" class="badge badge-info" style="margin-right: 20px; text-decoration: none; display: inline-block;">Export CSV</a>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Level</th>
+                                        <th>Source</th>
+                                        <th>Message</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="full-logs-table-body">
+                                    <tr><td colspan="4" class="text-center">Loading logs...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-network-logs" class="tab-pane" style="display: none;">
+                    <div class="glass-card table-container">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border);">
+                            <h3 class="section-title" style="border-bottom: none;">Network Connections & Suspicious IPs</h3>
+                            <a href="/api/export/network_ip" class="badge badge-info" style="margin-right: 20px; text-decoration: none; display: inline-block;">Export CSV</a>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Level</th>
+                                        <th>Source IP</th>
+                                        <th>Message</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="network-table-body">
+                                    <tr><td colspan="4" class="text-center">No network data yet...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-threat-history" class="tab-pane" style="display: none;">
+                    <div class="glass-card table-container">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border);">
+                            <h3 class="section-title" style="border-bottom: none;">Threat History</h3>
+                            <a href="/api/export/threat_history" class="badge badge-info" style="margin-right: 20px; text-decoration: none; display: inline-block;">Export CSV</a>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Severity</th>
+                                        <th>Type</th>
+                                        <th>Details</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="threats-table-body">
+                                    <tr><td colspan="5" class="text-center">Loading threat history...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-memory-logs" class="tab-pane" style="display: none;">
+                    <div class="glass-card">
+                        <h3 class="section-title">Memory Forensics</h3>
+                        <div style="padding: 24px;">
+                            <p style="color: var(--text-secondary); margin-bottom: 16px;">Memory inspection logs will appear here. No active memory dumps in progress.</p>
+                            <button class="badge badge-info" style="border: 1px solid var(--primary-cyan); padding: 8px 16px; cursor: pointer;">Run Memory Dump</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-settings" class="tab-pane" style="display: none;">
+                    <div class="glass-card">
+                        <h3 class="section-title">Settings & Configuration</h3>
+                        <div style="padding: 24px; color: var(--text-secondary);">
+                            <p>Configure your API keys, scan intervals, and alert emails below.</p>
+                            
+                            <div style="margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                                
+                                <!-- Core Settings -->
+                                <div style="display: flex; flex-direction: column; gap: 12px;">
+                                    <h4 style="color: var(--text-primary); border-bottom: 1px solid var(--glass-border); padding-bottom: 8px;">Core & Email</h4>
+                                    <div>
+                                        <label style="display: block; font-family: var(--font-mono); margin-bottom: 4px; font-size: 12px;">VirusTotal API Key</label>
+                                        <input type="password" id="vt-api-key" placeholder="your_virustotal_api_key_here" style="background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); padding: 8px; color: white; width: 100%; border-radius: 4px;" />
+                                    </div>
+                                    <div>
+                                        <label style="display: block; font-family: var(--font-mono); margin-bottom: 4px; font-size: 12px;">Email Sender</label>
+                                        <input type="email" id="email-sender" placeholder="your-email@gmail.com" style="background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); padding: 8px; color: white; width: 100%; border-radius: 4px;" />
+                                    </div>
+                                    <div>
+                                        <label style="display: block; font-family: var(--font-mono); margin-bottom: 4px; font-size: 12px;">Email Password</label>
+                                        <input type="password" id="email-password" placeholder="your-app-password" style="background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); padding: 8px; color: white; width: 100%; border-radius: 4px;" />
+                                    </div>
+                                    <div>
+                                        <label style="display: block; font-family: var(--font-mono); margin-bottom: 4px; font-size: 12px;">Email Receiver</label>
+                                        <input type="email" id="email-receiver" placeholder="admin-email@gmail.com" style="background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); padding: 8px; color: white; width: 100%; border-radius: 4px;" />
+                                    </div>
+                                </div>
+
+                                <!-- SIEM & Threat Intel -->
+                                <div style="display: flex; flex-direction: column; gap: 12px;">
+                                    <h4 style="color: var(--text-primary); border-bottom: 1px solid var(--glass-border); padding-bottom: 8px;">SIEM / Syslog Export</h4>
+                                    <div style="display: flex; gap: 12px;">
+                                        <div style="flex: 1;">
+                                            <label style="display: block; font-family: var(--font-mono); margin-bottom: 4px; font-size: 12px;">Output Mode</label>
+                                            <select id="output-mode" style="background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); padding: 8px; color: white; width: 100%; border-radius: 4px;">
+                                                <option value="both">Both</option>
+                                                <option value="syslog">Syslog Only</option>
+                                                <option value="db">DB Only</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; gap: 12px;">
+                                        <div style="flex: 2;">
+                                            <label style="display: block; font-family: var(--font-mono); margin-bottom: 4px; font-size: 12px;">Syslog Host</label>
+                                            <input type="text" id="syslog-host" placeholder="127.0.0.1" value="127.0.0.2" style="background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); padding: 8px; color: white; width: 100%; border-radius: 4px;" />
+                                        </div>
+                                        <div style="flex: 1;">
+                                            <label style="display: block; font-family: var(--font-mono); margin-bottom: 4px; font-size: 12px;">Port</label>
+                                            <input type="number" id="syslog-port" placeholder="514" value="514" style="background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); padding: 8px; color: white; width: 100%; border-radius: 4px;" />
+                                        </div>
+                                    </div>
+
+                                    <h4 style="color: var(--text-primary); border-bottom: 1px solid var(--glass-border); padding-bottom: 8px; margin-top: 12px;">Threat Intel Feeds (Live CTI)</h4>
+                                    <div>
+                                        <label style="display: block; font-family: var(--font-mono); margin-bottom: 4px; font-size: 12px;">AbuseIPDB API Key</label>
+                                        <input type="password" id="abuseipdb-key" placeholder="your_abuseipdb_api_key_here" style="background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); padding: 8px; color: white; width: 100%; border-radius: 4px;" />
+                                    </div>
+                                    <div>
+                                        <label style="display: block; font-family: var(--font-mono); margin-bottom: 4px; font-size: 12px;">MalwareBazaar API Key</label>
+                                        <input type="password" id="malwarebazaar-key" placeholder="your_malware_bazaar_api_key_here" style="background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); padding: 8px; color: white; width: 100%; border-radius: 4px;" />
+                                    </div>
+                                </div>
+
+                            </div>
+                            
+                            <div style="margin-top: 24px; border-top: 1px solid var(--glass-border); padding-top: 16px;">
+                                <button id="btn-save-settings" class="badge badge-info" style="cursor: pointer; padding: 8px 16px; font-size: 14px;">Save Settings</button>
+                                <span id="settings-status" style="margin-left: 12px; font-size: 12px; font-family: var(--font-mono); color: var(--primary-cyan); opacity: 0; transition: opacity 0.3s;">Saved!</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+    <script src="/static/script.js"></script>
+</body>
+</html>

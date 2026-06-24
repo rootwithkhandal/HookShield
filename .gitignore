@@ -6,6 +6,7 @@
 # Secrets & credentials — NEVER commit these
 # -----------------------------------------------------------------------------
 .env
+.config
 config.local.yaml          # local overrides with real credentials
 
 # config.yaml is committed as an empty template (all values are blank).

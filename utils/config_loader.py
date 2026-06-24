@@ -6,7 +6,8 @@ import os
 import yaml
 from dotenv import load_dotenv
 
-load_dotenv()  # Load .env if present
+# Load .config instead of .env
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".config"))
 
 
 def load_config(filepath: str = None) -> dict:

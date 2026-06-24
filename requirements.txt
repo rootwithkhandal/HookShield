@@ -12,10 +12,9 @@ yara-python
 maturin
 
 # GUI
-# Removed ui/gui.py in favor of web/dashboard.py
-streamlit==1.41.1
+# Removed streamlit in favor of custom Flask dashboard
+flask==3.0.3
 pandas==2.2.3
-streamlit-autorefresh==1.0.1
 
 
 

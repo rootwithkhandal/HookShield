@@ -1,6 +1,6 @@
-# 🛡️ LogDefender
+# 🛡️ HookShield
 
-A real-time keylogger detection and response system built in Python. LogDefender monitors running processes, file hashes, keyboard hooks, network connections, clipboard access, and startup entries — then alerts, logs, and lets you act on threats directly from a modern GUI or CLI.
+A real-time system detection and response tool built in Python. HookShield monitors running processes, file hashes, keyboard hooks, network connections, clipboard access, and startup entries — then alerts, logs, and lets you act on threats directly from a modern Web Dashboard or CLI.
 
 ---
 
@@ -29,20 +29,20 @@ A real-time keylogger detection and response system built in Python. LogDefender
 - **CSV export** — export all logs and threat history to CSV from the GUI or dashboard
 
 ### Interfaces
-- **GUI** — tabbed CustomTkinter app (Dashboard · Processes · File Scanner · Network · Quarantine · Startup · Settings)
+- **Web dashboard** — Custom Glassmorphic Flask app with charts, live auto-refresh, and CSV exports
+- **GUI** — tabbed CustomTkinter app (Dashboard · Processes · File Scanner · Network · Quarantine · Startup)
 - **CLI** — single-scan or continuous monitor mode with `--directory` and `--interval` flags
-- **Web dashboard** — 4-page Streamlit app (Overview · Detection Logs · Network Logs · Threat History) with charts and live auto-refresh
 
 ---
 
 ## Project Structure
 
 ```
-def-keylogger-shield/
+HookShield/
 │
 ├── main.py                  # Orchestration — all detection + alert functions
 ├── cli.py                   # CLI entry point
-├── kd_app.py                # GUI launcher
+├── kd_app.py                # Desktop GUI launcher
 ├── monitor.py               # Standalone background monitor
 │
 ├── core/
@@ -54,11 +54,12 @@ def-keylogger-shield/
 │   ├── startup_scanner.py        # Registry + startup folder scanner
 │   └── quarantine.py             # Quarantine engine (move/restore/delete)
 │
-├── ui/
-│   └── gui.py               # CustomTkinter tabbed GUI
-│
 ├── web/
-│   └── dashboard.py         # Streamlit web dashboard
+│   ├── app.py               # Flask web backend
+│   └── static/              # HTML/CSS/JS frontend (Cyber-Glass Aesthetic)
+│
+├── ui/
+│   └── gui.py               # CustomTkinter desktop GUI
 │
 ├── utils/
 │   ├── config_loader.py     # Centralised config + env var loading
@@ -74,30 +75,33 @@ def-keylogger-shield/
 │   └── suspicious_keywords.yaml  # Process keyword list (fully configurable)
 │
 ├── quarantine/              # Created automatically on first quarantine
-├── config.yaml              # App configuration (use .env for secrets)
-├── .env.example             # Template for secret environment variables
+├── config.yaml              # App configuration (use .config for secrets)
+├── .config.example          # Template for secret environment variables
 ├── .gitignore
-└── requirements.txt
+├── requirements.txt
+└── .mise.toml               # Task runner configuration
 ```
 
 ---
 
 ## Installation
 
-**Requirements:** Python 3.10+
+**Requirements:** Python 3.10+ and [Mise](https://mise.jdx.dev/)
 
 ```bash
-git clone https://github.com/your-username/def-keylogger-shield.git
-cd def-keylogger-shield
-pip install -r requirements.txt
+git clone https://github.com/your-username/HookShield.git
+cd HookShield
+
+# Install dependencies using mise task
+mise run install
 ```
 
 ### Configure secrets
 
-Copy `.env.example` to `.env` and fill in your values. Environment variables take priority over `config.yaml`.
+Copy `.config.example` to `.config` and fill in your values. Environment variables take priority over `config.yaml`.
 
 ```bash
-copy .env.example .env
+copy .config.example .config
 ```
 
 ```env
@@ -105,73 +109,67 @@ VIRUS_TOTAL_API_KEY=your_virustotal_api_key_here
 EMAIL_SENDER=your_gmail@gmail.com
 EMAIL_PASSWORD=your_gmail_app_password_here
 EMAIL_RECEIVER=alert_recipient@example.com
+OUTPUT_MODE=both
+SYSLOG_HOST=127.0.0.1
+SYSLOG_PORT=514
+ABUSEIPDB_API_KEY=your_abuseipdb_api_key_here
+MALWARE_BAZAAR_API_KEY=your_malware_bazaar_api_key_here
 ```
 
-> **Never commit `.env` or a `config.yaml` with real credentials.** Both are listed in `.gitignore`.
+> **Never commit `.config` or a `config.yaml` with real credentials.** Both are listed in `.gitignore`.
 
 ---
 
 ## Usage
 
-### GUI (recommended)
+### Web Dashboard (Recommended)
 
 ```bash
-python kd_app.py
+mise run ui
 ```
 
-Opens the tabbed desktop application. Use the **Dashboard** tab to run a full scan or start the real-time monitor. Each tab is focused on a specific detection or response task.
+Opens at `http://localhost:5000`. Features a modern, cyber-glass aesthetic UI with live metrics, charts, and detection logs.
+You can view your threat history, network logs, and configure settings directly from the browser. 
+It also includes **CSV Export** buttons for the Detection Logs, Network Connections, and Threat History tables.
 
 ### CLI
 
 ```bash
 # One-shot scan of the current directory
-python cli.py
+mise run run
 
-# Scan a specific directory
+# Scan a specific directory (via direct python invocation)
 python cli.py --directory C:\Users\YourName\Downloads
 
 # Continuous monitoring every 30 seconds
 python cli.py --monitor --interval 30
-
-# Verbose output
-python cli.py --verbose
 ```
 
-Exit code `0` = clean, `1` = threats found (useful for scripting/CI).
-
-### Background monitor
+### Desktop GUI (Legacy)
 
 ```bash
-python monitor.py --directory C:\Users --interval 60
+python kd_app.py
 ```
 
-### Web dashboard
-
-```bash
-streamlit run web/dashboard.py
-```
-
-Opens at `http://localhost:8501`. Four pages: Overview (metrics + charts), Detection Logs, Network Logs, Threat History.
+Opens the older tabbed desktop application via CustomTkinter.
 
 ---
 
-## GUI Tabs
+## Web Dashboard Tabs
 
 | Tab | What you can do |
 |-----|----------------|
-| **Dashboard** | Full scan, real-time monitor toggle, threat metric cards, CSV export, open web dashboard |
-| **Processes** | Scan processes, check clipboard access, kill a selected suspicious process |
-| **File Scanner** | Browse and scan a file or directory, quarantine suspicious results |
-| **Network** | View all system IPs, add IPs to the watchlist, block suspicious IPs |
-| **Quarantine** | View quarantined files, restore to original location, or permanently delete |
-| **Startup** | Scan Windows registry and startup folders for persistence entries |
-| **Settings** | Edit VirusTotal API key and email credentials, save to config.yaml |
+| **Overview** | View high-level metrics, threat charts, and recent security logs |
+| **Detection Logs** | View all historical system scans and flags with full CSV export |
+| **Network Logs** | View historical network connections and suspicious IP flags with CSV export |
+| **Threat History** | View specifically marked threats and their resolution status with CSV export |
+| **Settings** | Update API keys and export configuration securely to `.config` without leaving the browser |
 
 ---
 
 ## Configuration
 
-`config.yaml` holds non-secret settings. Secrets should be set via environment variables or `.env`.
+`config.yaml` holds non-secret settings. Secrets should be set via environment variables or `.config`.
 
 ```yaml
 virus_total_api_key: ""   # or set VIRUS_TOTAL_API_KEY env var
@@ -190,7 +188,7 @@ Edit `data/suspicious_keywords.yaml` to add or remove process keywords. Edit `da
 
 ## Database Schema
 
-LogDefender uses a local SQLite file (`logs.db`) with three tables.
+HookShield uses a local SQLite file (`logs.db`) with three tables.
 
 **`logs`** — general detection events
 | Column | Type | Description |
@@ -227,36 +225,23 @@ LogDefender uses a local SQLite file (`logs.db`) with three tables.
 | Library | Purpose |
 |---------|---------|
 | `psutil` | Process, network connection, and system info |
+| `flask` | Web dashboard backend API |
+| `python-dotenv` | `.config` secret loading |
 | `pynput` | Keyboard hook detection fallback |
 | `hashlib` | SHA-256 file hashing |
 | `requests` | VirusTotal API calls |
 | `sqlite3` | Embedded database (stdlib) |
-| `customtkinter` | Modern dark-themed GUI |
-| `streamlit` | Web dashboard |
-| `pandas` | Log data manipulation and display |
 | `pyyaml` | Config and data file parsing |
-| `python-dotenv` | `.env` secret loading |
 
 ---
 
 ## Security Notes
 
-- Secrets (API keys, email passwords) should be stored in `.env`, not `config.yaml`
+- Secrets (API keys, email passwords) should be stored in `.config`, not `config.yaml`
 - All file hashing uses SHA-256 — MD5 is not used anywhere
 - VirusTotal API calls are rate-limited to respect the free tier (4 req/min)
 - IP blocking uses `netsh advfirewall` on Windows and `iptables` on Linux
 - The quarantine folder stores files with a `.quar` extension and a `.manifest` sidecar — original paths are preserved for safe restoration
-
----
-
-## Contributing
-
-Fork the repo, create a feature branch, and open a pull request. Areas where contributions are especially welcome:
-
-- Additional detection heuristics (e.g. DLL injection detection, memory scanning)
-- macOS support for startup scanner and IP blocker
-- Unit tests for core detection modules
-- Threat intelligence feed integration
 
 ---
 
