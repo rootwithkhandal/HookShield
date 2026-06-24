@@ -18,6 +18,33 @@ logger = logging.getLogger(__name__)
 # Seconds to wait between VirusTotal API calls (free tier = 4 req/min → 15 s)
 _VT_RATE_LIMIT_DELAY = 15
 
+# YARA Setup
+YARA_RULES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "rules", "keyloggers.yara"))
+compiled_rules = None
+
+try:
+    import yara
+    if os.path.exists(YARA_RULES_PATH):
+        compiled_rules = yara.compile(filepath=YARA_RULES_PATH)
+        logger.info("YARA rules loaded successfully.")
+except ImportError:
+    logger.warning("yara-python not installed. YARA behavioral scanning disabled.")
+except Exception as e:
+    logger.error("Failed to compile YARA rules: %s", e)
+
+def check_yara(file_path: str) -> bool:
+    """Scan file against compiled YARA rules."""
+    if compiled_rules is None:
+        return False
+    try:
+        matches = compiled_rules.match(file_path)
+        if matches:
+            logger.warning("YARA Rule Match on %s: %s", file_path, [m.rule for m in matches])
+            return True
+    except Exception:
+        pass
+    return False
+
 
 def _sha256(file_path: str) -> str | None:
     """Return SHA-256 hex digest of a file, or None on read error."""
@@ -98,6 +125,11 @@ def scan_files(
                 suspicious.append(path)
                 continue
 
+            # YARA Check (instant, behavioral)
+            if check_yara(path):
+                suspicious.append(path)
+                continue
+
             # VirusTotal check (rate-limited)
             if api_key:
                 elapsed = time.time() - last_vt_call
@@ -132,6 +164,9 @@ def scan_single_file(
 
     if file_hash in known_hashes:
         logger.warning("Known malicious hash match: %s", file_path)
+        return [file_path]
+
+    if check_yara(file_path):
         return [file_path]
 
     if api_key and check_file_virus_total(file_hash, api_key):
