@@ -17,8 +17,8 @@ from core.file_scanner import scan_files
 from core.keyboard_hook_detector import detect_keyboard_hooks
 from core.remote_connection_detector import detect_remote_connections
 from core.clipboard_monitor import detect_clipboard_access
-from core.startup_scanner import scan_startup_entries
 from core.memory_scanner import detect_dll_injection
+from core.etw_consumer import start_etw_listeners, get_next_etw_event
 
 logger = logging.getLogger(__name__)
 
@@ -96,17 +96,9 @@ def detect_clipboard() -> list[dict]:
     return hits
 
 
-def scan_startup() -> list[dict]:
-    """Scan startup entries for suspicious items."""
-    logger.info("--- Startup entry scan ---")
-    entries = scan_startup_entries()
-
-    if entries:
-        insert_log("WARN", "Suspicious startup entries detected.", str(entries))
-        insert_threat("startup", "HIGH", f"Suspicious startup entries: {entries}")
-        send_alert("Startup Entry", entries, "Remove entry.")
-
-    return entries
+def route_etw_events_sync(event):
+    """Fallback handler for ETW events if we parse them manually."""
+    pass
 
 
 def detect_memory_injection() -> list[dict]:
@@ -166,31 +158,58 @@ def send_alert(alert_type: str, details, action: str = ""):
 # Monitor loop
 # ---------------------------------------------------------------------------
 
+async def route_etw_events():
+    """Consume events from the ETW queue and route them."""
+    async for event in get_next_etw_event():
+        try:
+            event_str = str(event).lower()
+            
+            # Simple keyword-based event routing since `etw` dict structures vary
+            if 'registry' in event_str and ('\\run' in event_str or 'runonce' in event_str):
+                insert_log("WARN", "ETW: Suspicious Registry Run Key modified", event_str[:200])
+                insert_threat("startup", "HIGH", "Registry RUN key modified (ETW)")
+                send_alert("Registry Startup", event_str[:200], "Check registry RUN keys immediately.")
+                
+            elif 'process' in event_str and 'create' in event_str:
+                # Here we could trigger a targeted VT check on the new process executable.
+                insert_log("INFO", "ETW: Process Created", event_str[:150])
+                
+        except Exception as e:
+            logger.error("ETW routing error: %s", e)
+
 async def monitor_system(directory: str = ".", interval: int = 60):
     """
     Continuously run all detection checks concurrently.
     """
     logger.info("LogDefender monitor started. Scan interval: %d s", interval)
+    
+    etw_active = start_etw_listeners()
+    if etw_active:
+        logger.info("ETW Active: Swapping polling modules for event-driven router.")
+        asyncio.create_task(route_etw_events())
+
     while True:
         try:
-            # ponytail: run blocking scanners concurrently in a thread pool
-            results = await asyncio.wait_for(
-                asyncio.gather(
-                    asyncio.to_thread(detect_keyloggers),
-                    asyncio.to_thread(scanning_files, directory),
-                    asyncio.to_thread(detect_clipboard),
-                    asyncio.to_thread(scan_startup),
-                    asyncio.to_thread(detect_memory_injection)
-                ),
-                timeout=45.0
-            )
-            processes, (files, _), _, _, _ = results
+            tasks = [
+                asyncio.to_thread(detect_clipboard),
+                asyncio.to_thread(detect_memory_injection),
+                asyncio.to_thread(scanning_files, directory)
+            ]
+            
+            if not etw_active:
+                tasks.append(asyncio.to_thread(detect_keyloggers))
 
-            # network depends on processes and files
+            results = await asyncio.wait_for(asyncio.gather(*tasks), timeout=45.0)
+
+            # Network scan logic (we pass empty lists if ETW is replacing polling)
+            processes = results[3] if not etw_active else []
+            files, _ = results[2]
+            
             await asyncio.wait_for(
                 asyncio.to_thread(detect_network, processes, files),
                 timeout=15.0
             )
+            
         except asyncio.TimeoutError:
             logger.error("A scan cycle timed out!")
         except Exception as e:

@@ -7,6 +7,7 @@ pynput==1.7.7
 requests==2.32.3
 pyyaml==6.0.2
 python-dotenv==1.0.1
+etw
 
 # GUI
 # Removed ui/gui.py in favor of web/dashboard.py
