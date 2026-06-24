@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hookshield"
+version = "0.1.0"
+description = "Behavioral keylogger and memory injection detector for Windows"
+authors = [{name = "HookShield Team"}]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "psutil",
+    "pywin32",
+    "requests",
+    "python-dotenv",
+    "etw",
+    "yara-python",
+    "streamlit",
+    "plotly"
+]
+
+[project.scripts]
+hookshield = "hookshield_cli:main"
+
+[tool.setuptools]
+packages = ["core", "utils", "web"]
+py-modules = ["hookshield_cli", "main"]
