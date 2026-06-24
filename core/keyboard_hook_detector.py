@@ -6,6 +6,11 @@ Strategy:
   2. Fallback — attempt to start a pynput Listener; if another hook is
      already consuming events the listener may raise, which we treat as
      a positive signal.  A clean start is treated as no hook detected.
+
+KNOWN GAPS (Hook Spoofing Resistance):
+  - DKOM (Direct Kernel Object Manipulation): This module operates entirely in user-mode (Ring 3). It cannot detect kernel-mode hooks that manipulate the system service dispatch table (SSDT) or interrupt descriptor table (IDT).
+  - ETW Kernel Callbacks: Advanced rootkits leveraging undocumented ETW tracing callbacks to capture keystrokes will bypass this scanner.
+  - Raw Input API / DirectInput: Keyloggers using raw input polling instead of SetWindowsHookEx will not trigger this detection.
 """
 import logging
 import platform

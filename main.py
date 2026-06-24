@@ -22,6 +22,7 @@ from core.clipboard_monitor import detect_clipboard_access
 from core.memory_scanner import detect_dll_injection
 from core.etw_consumer import start_etw_listeners, get_next_etw_event
 from core.scoring_engine import BehavioralScorer
+from core.wmi_scanner import detect_wmi_persistence
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +139,22 @@ def detect_memory_injection() -> list[dict]:
     return hits
 
 
+def scan_wmi() -> list[dict]:
+    """Scan for advanced fileless WMI persistence."""
+    logger.info("--- WMI Persistence Scan ---")
+    hits = detect_wmi_persistence()
+    
+    if hits:
+        insert_log("WARN", "Suspicious WMI persistence detected.", str(hits))
+        for h in hits:
+            name = h.get('name', 'Unknown')
+            # WMI runs as system (PID 0)
+            if scorer.add_event(0, f"WMI_{name}", "WMI Persistence", 70):
+                _trigger_aggregate_alert(0, f"WMI_{name}")
+                
+    return hits
+
+
 def kill_process(pid: int) -> bool:
     """
     Terminate a process by PID.
@@ -221,6 +238,7 @@ async def monitor_system(directory: str = ".", interval: int = 60):
             tasks = [
                 asyncio.to_thread(detect_clipboard),
                 asyncio.to_thread(detect_memory_injection),
+                asyncio.to_thread(scan_wmi),
                 asyncio.to_thread(scanning_files, directory)
             ]
             
@@ -229,9 +247,9 @@ async def monitor_system(directory: str = ".", interval: int = 60):
 
             results = await asyncio.wait_for(asyncio.gather(*tasks), timeout=45.0)
 
-            # Network scan logic (we pass empty lists if ETW is replacing polling)
-            processes = results[3] if not etw_active else []
-            files, _ = results[2]
+            # Network scan logic
+            processes = results[4] if not etw_active else []
+            files, _ = results[3]
             
             await asyncio.wait_for(
                 asyncio.to_thread(detect_network, processes, files),
