@@ -5,6 +5,7 @@ Provides individual detection functions and a monitor_system() loop.
 """
 import logging
 import time
+import asyncio
 
 from utils.logger import configure_logger
 from utils.config_loader import load_config, load_known_hashes
@@ -165,25 +166,37 @@ def send_alert(alert_type: str, details, action: str = ""):
 # Monitor loop
 # ---------------------------------------------------------------------------
 
-def monitor_system(directory: str = ".", interval: int = 60):
+async def monitor_system(directory: str = ".", interval: int = 60):
     """
-    Continuously run all detection checks.
-
-    :param directory: Directory to scan for suspicious files.
-    :param interval:  Seconds to sleep between scan cycles.
+    Continuously run all detection checks concurrently.
     """
     logger.info("LogDefender monitor started. Scan interval: %d s", interval)
     while True:
         try:
-            processes = detect_keyloggers()
-            files, _ = scanning_files(directory)
-            detect_network(processes, files)
-            detect_clipboard()
-            scan_startup()
-            detect_memory_injection()
+            # ponytail: run blocking scanners concurrently in a thread pool
+            results = await asyncio.wait_for(
+                asyncio.gather(
+                    asyncio.to_thread(detect_keyloggers),
+                    asyncio.to_thread(scanning_files, directory),
+                    asyncio.to_thread(detect_clipboard),
+                    asyncio.to_thread(scan_startup),
+                    asyncio.to_thread(detect_memory_injection)
+                ),
+                timeout=45.0
+            )
+            processes, (files, _), _, _, _ = results
+
+            # network depends on processes and files
+            await asyncio.wait_for(
+                asyncio.to_thread(detect_network, processes, files),
+                timeout=15.0
+            )
+        except asyncio.TimeoutError:
+            logger.error("A scan cycle timed out!")
         except Exception as e:
             logger.error("Unexpected error in monitor loop: %s", e)
-        time.sleep(interval)
+            
+        await asyncio.sleep(interval)
 
 
 # ---------------------------------------------------------------------------
@@ -193,4 +206,7 @@ def monitor_system(directory: str = ".", interval: int = 60):
 if __name__ == "__main__":
     configure_logger()
     logger.info("Starting LogDefender...")
-    monitor_system()
+    try:
+        asyncio.run(monitor_system())
+    except KeyboardInterrupt:
+        logger.info("LogDefender shut down.")

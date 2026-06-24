@@ -52,12 +52,15 @@ if page == "Overview":
     try: df_t = pd.read_sql("SELECT * FROM threat_history", get_db())
     except: df_t = pd.DataFrame()
 
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c1, c2 = st.columns(2)
     c1.metric("Total Threats", len(df_t))
     c2.metric("Unresolved", len(df_t[df_t['resolved'] == 0]) if len(df_t) else 0)
-    c3.metric("Process Threats", len(df_t[df_t['threat_type'] == 'process']) if len(df_t) else 0)
-    c4.metric("File Threats", len(df_t[df_t['threat_type'] == 'file']) if len(df_t) else 0)
-    c5.metric("Network Threats", len(df_t[df_t['threat_type'] == 'network']) if len(df_t) else 0)
+
+    if len(df_t):
+        types = sorted(df_t['threat_type'].unique())
+        cols = st.columns(len(types))
+        for col, t_type in zip(cols, types):
+            col.metric(f"{t_type.replace('_', ' ').title()} Threats", len(df_t[df_t['threat_type'] == t_type]))
 
     st.divider()
     col_left, col_right = st.columns(2)
