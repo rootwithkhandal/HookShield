@@ -7,6 +7,7 @@ import logging
 import psutil
 
 from utils.dblogs import fetch_suspicious_ips
+from core.threat_intel_feed import get_abuseipdb_ips
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ def detect_remote_connections() -> list[dict]:
     Each result dict contains: local_addr, remote_addr, status, pid.
     """
     suspicious_ips = set(fetch_suspicious_ips())
+    suspicious_ips.update(get_abuseipdb_ips())
 
     if not suspicious_ips:
         logger.info("No suspicious IPs in database — skipping connection check.")

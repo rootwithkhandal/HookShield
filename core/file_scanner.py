@@ -11,7 +11,8 @@ import time
 
 import requests
 
-from utils.config_loader import load_config, load_known_hashes
+from utils.config_loader import load_config
+from core.threat_intel_feed import get_malware_bazaar_hashes
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +105,7 @@ def scan_files(
     Returns a list of suspicious file paths.
     """
     if known_hashes is None:
-        known_hashes = load_known_hashes()
+        known_hashes = get_malware_bazaar_hashes()
     if api_key is None:
         cfg = load_config()
         api_key = cfg.get("virus_total_api_key", "")
@@ -153,7 +154,7 @@ def scan_single_file(
     Returns a list containing the file path if suspicious, else empty list.
     """
     if known_hashes is None:
-        known_hashes = load_known_hashes()
+        known_hashes = get_malware_bazaar_hashes()
     if api_key is None:
         cfg = load_config()
         api_key = cfg.get("virus_total_api_key", "")

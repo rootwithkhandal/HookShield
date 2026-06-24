@@ -54,6 +54,14 @@ def load_config(filepath: str = None) -> dict:
     if syslog_port:
         config["syslog_port"] = syslog_port
 
+    abuseipdb_key = os.getenv("ABUSEIPDB_API_KEY")
+    if abuseipdb_key:
+        config["abuseipdb_api_key"] = abuseipdb_key
+
+    mb_key = os.getenv("MALWARE_BAZAAR_API_KEY")
+    if mb_key:
+        config["malware_bazaar_api_key"] = mb_key
+
     return config
 
 

@@ -7,6 +7,7 @@ import logging
 import psutil
 
 from utils.config_loader import load_suspicious_keywords
+from core.threat_intel_feed import get_openphish_domains
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,11 @@ def detect_suspicious_processes() -> list[dict]:
     keywords = load_suspicious_keywords()
     if not keywords:
         logger.warning("suspicious_keywords.yaml empty or missing — using fallback list.")
-        keywords = _FALLBACK_KEYWORDS
+        keywords = _FALLBACK_KEYWORDS[:]
+
+    phish_urls = get_openphish_domains()
+    if phish_urls:
+        keywords.extend(phish_urls)
 
     detected = []
 
