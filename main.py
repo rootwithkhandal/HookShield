@@ -6,6 +6,8 @@ Provides individual detection functions and a monitor_system() loop.
 import logging
 import time
 import asyncio
+import argparse
+import threading
 
 from utils.logger import configure_logger
 from utils.config_loader import load_config, load_known_hashes
@@ -249,8 +251,17 @@ async def monitor_system(directory: str = ".", interval: int = 60):
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="HookShield Orchestrator")
+    parser.add_argument("--red-team", action="store_true", help="Run Red Team Evasion Testing Mode")
+    args = parser.parse_args()
+
     configure_logger()
     logger.info("Starting LogDefender...")
+    
+    if args.red_team:
+        from core.red_team import run_red_team_simulation
+        threading.Thread(target=run_red_team_simulation, daemon=True).start()
+
     try:
         asyncio.run(monitor_system())
     except KeyboardInterrupt:
