@@ -42,6 +42,18 @@ def load_config(filepath: str = None) -> dict:
         if email_receiver:
             config["email"]["receiver"] = email_receiver
 
+    output_mode = os.getenv("OUTPUT_MODE")
+    if output_mode:
+        config["output_mode"] = output_mode
+
+    syslog_host = os.getenv("SYSLOG_HOST")
+    if syslog_host:
+        config["syslog_host"] = syslog_host
+
+    syslog_port = os.getenv("SYSLOG_PORT")
+    if syslog_port:
+        config["syslog_port"] = syslog_port
+
     return config
 
 

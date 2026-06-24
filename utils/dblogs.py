@@ -7,6 +7,20 @@ import io
 import sqlite3
 import os
 from datetime import datetime
+from utils.config_loader import load_config
+try:
+    from utils.syslog_exporter import SyslogSender
+except ImportError:
+    SyslogSender = None
+
+_cfg = load_config()
+OUTPUT_MODE = _cfg.get("output_mode", "sqlite").lower()
+SYSLOG_HOST = _cfg.get("syslog_host", "127.0.0.1")
+SYSLOG_PORT = int(_cfg.get("syslog_port", 514))
+
+_syslog_sender = None
+if OUTPUT_MODE in ["syslog", "both"] and SyslogSender:
+    _syslog_sender = SyslogSender(SYSLOG_HOST, SYSLOG_PORT)
 
 # Resolve DB path relative to project root so it works from any cwd
 _DB_PATH = os.path.join(os.path.dirname(__file__), "..", "logs.db")
@@ -63,42 +77,54 @@ def create_db():
 # ---------------------------------------------------------------------------
 
 def insert_log(level: str, log_message: str, location: str):
-    """Insert a general log entry."""
-    conn = sqlite3.connect(_get_db_path())
-    c = conn.cursor()
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    c.execute(
-        "INSERT INTO logs (timestamp, level, message, location) VALUES (?, ?, ?, ?)",
-        (timestamp, level, log_message, str(location)),
-    )
-    conn.commit()
-    conn.close()
+    """Insert a general log entry and optionally export to syslog."""
+    if OUTPUT_MODE in ["sqlite", "both"]:
+        conn = sqlite3.connect(_get_db_path())
+        c = conn.cursor()
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        c.execute(
+            "INSERT INTO logs (timestamp, level, message, location) VALUES (?, ?, ?, ?)",
+            (timestamp, level, log_message, str(location)),
+        )
+        conn.commit()
+        conn.close()
+
+    if _syslog_sender:
+        _syslog_sender.send(level, "HS_LOG", {"message": log_message, "location": str(location)})
 
 
 def db_network_ip(level: str, message: str, source_ip: str):
-    """Insert a network IP log entry."""
-    conn = sqlite3.connect(_get_db_path())
-    c = conn.cursor()
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    c.execute(
-        "INSERT INTO network_ip (timestamp, level, message, source_ip) VALUES (?, ?, ?, ?)",
-        (timestamp, level, message, source_ip),
-    )
-    conn.commit()
-    conn.close()
+    """Insert a network IP log entry and optionally export to syslog."""
+    if OUTPUT_MODE in ["sqlite", "both"]:
+        conn = sqlite3.connect(_get_db_path())
+        c = conn.cursor()
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        c.execute(
+            "INSERT INTO network_ip (timestamp, level, message, source_ip) VALUES (?, ?, ?, ?)",
+            (timestamp, level, message, source_ip),
+        )
+        conn.commit()
+        conn.close()
+
+    if _syslog_sender:
+        _syslog_sender.send(level, "HS_NET", {"message": message, "source_ip": source_ip})
 
 
 def insert_threat(threat_type: str, severity: str, description: str):
-    """Record a detected threat in the threat_history table."""
-    conn = sqlite3.connect(_get_db_path())
-    c = conn.cursor()
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    c.execute(
-        "INSERT INTO threat_history (timestamp, threat_type, severity, description) VALUES (?, ?, ?, ?)",
-        (timestamp, threat_type, severity, description),
-    )
-    conn.commit()
-    conn.close()
+    """Record a detected threat and optionally export to syslog."""
+    if OUTPUT_MODE in ["sqlite", "both"]:
+        conn = sqlite3.connect(_get_db_path())
+        c = conn.cursor()
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        c.execute(
+            "INSERT INTO threat_history (timestamp, threat_type, severity, description) VALUES (?, ?, ?, ?)",
+            (timestamp, threat_type, severity, description),
+        )
+        conn.commit()
+        conn.close()
+
+    if _syslog_sender:
+        _syslog_sender.send(severity, "HS_THREAT", {"threat_type": threat_type, "severity": severity, "description": description})
 
 
 def mark_threat_resolved(threat_id: int):
