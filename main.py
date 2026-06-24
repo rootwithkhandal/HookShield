@@ -17,6 +17,7 @@ from core.keyboard_hook_detector import detect_keyboard_hooks
 from core.remote_connection_detector import detect_remote_connections
 from core.clipboard_monitor import detect_clipboard_access
 from core.startup_scanner import scan_startup_entries
+from core.memory_scanner import detect_dll_injection
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,19 @@ def scan_startup() -> list[dict]:
     return entries
 
 
+def detect_memory_injection() -> list[dict]:
+    """Scan target processes for DLL injection/shellcode."""
+    logger.info("--- Memory injection scan ---")
+    hits = detect_dll_injection()
+
+    if hits:
+        insert_log("WARN", "Memory injection detected.", str(hits))
+        insert_threat("memory", "HIGH", f"Injected into: {[h['name'] for h in hits]}")
+        send_alert("Memory Injection", hits, "Investigate process immediately.")
+
+    return hits
+
+
 def kill_process(pid: int) -> bool:
     """
     Terminate a process by PID.
@@ -166,6 +180,7 @@ def monitor_system(directory: str = ".", interval: int = 60):
             detect_network(processes, files)
             detect_clipboard()
             scan_startup()
+            detect_memory_injection()
         except Exception as e:
             logger.error("Unexpected error in monitor loop: %s", e)
         time.sleep(interval)
