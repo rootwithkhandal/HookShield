@@ -1,7 +1,7 @@
 rule HawkEye_Keylogger {
     meta:
         description = "Detects HawkEye Keylogger strings and artifacts"
-        author = "LogDefender"
+        author = "HookShield"
         threat_level = "High"
     strings:
         $s1 = "HawkEye Keylogger" ascii wide nocase
@@ -15,7 +15,7 @@ rule HawkEye_Keylogger {
 rule AgentTesla_Keylogger {
     meta:
         description = "Detects Agent Tesla Keylogger strings and behavior"
-        author = "LogDefender"
+        author = "HookShield"
         threat_level = "High"
     strings:
         $s1 = "Agent Tesla" ascii wide nocase
@@ -30,7 +30,7 @@ rule AgentTesla_Keylogger {
 rule Snake_Keylogger {
     meta:
         description = "Detects Snake Keylogger strings"
-        author = "LogDefender"
+        author = "HookShield"
         threat_level = "High"
     strings:
         $s1 = "Snake Keylogger" ascii wide nocase

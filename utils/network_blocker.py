@@ -21,7 +21,7 @@ def _block_ip_windows(ip: str):
         subprocess.run(
             [
                 "netsh", "advfirewall", "firewall", "add", "rule",
-                f"name=LogDefender_Block_{ip}",
+                f"name=HookShield_Block_{ip}",
                 "dir=in", "action=block",
                 f"remoteip={ip}",
             ],
@@ -30,7 +30,7 @@ def _block_ip_windows(ip: str):
         subprocess.run(
             [
                 "netsh", "advfirewall", "firewall", "add", "rule",
-                f"name=LogDefender_Block_{ip}_out",
+                f"name=HookShield_Block_{ip}_out",
                 "dir=out", "action=block",
                 f"remoteip={ip}",
             ],
@@ -97,7 +97,7 @@ def block_suspicious_ips(db_path: str = None) -> list:
                 f"---------\n"
                 f"IP Address : {ip}\n"
                 f"Action     : Incoming and outgoing traffic blocked.\n\n"
-                f"This is an automated alert from LogDefender."
+                f"This is an automated alert from HookShield."
             )
             send_email(subject=subject, body=body)
         else:

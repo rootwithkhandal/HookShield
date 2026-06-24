@@ -1,5 +1,5 @@
 """
-LogDefender — main orchestration module.
+HookShield — main orchestration module.
 
 Provides individual detection functions and a monitor_system() loop.
 """
@@ -192,7 +192,7 @@ def send_alert(alert_type: str, details, action: str = ""):
     # ponytail: one unified alert function
     body = f"🚨 Threat Alert: Suspicious {alert_type} Detected\n\nDetails:\n---------\n{details}\n"
     if action: body += f"Action: {action}\n\n"
-    send_email(f"🚨 SCRAMBLE — Suspicious {alert_type} Detected", body + "This is an automated alert from LogDefender.")
+    send_email(f"🚨 SCRAMBLE — Suspicious {alert_type} Detected", body + "This is an automated alert from HookShield.")
 
 
 # ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ async def monitor_system(directory: str = ".", interval: int = 60):
     """
     Continuously run all detection checks concurrently.
     """
-    logger.info("LogDefender monitor started. Scan interval: %d s", interval)
+    logger.info("HookShield monitor started. Scan interval: %d s", interval)
     
     etw_active = start_etw_listeners()
     if etw_active:
@@ -274,7 +274,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     configure_logger()
-    logger.info("Starting LogDefender...")
+    logger.info("Starting HookShield...")
     
     if args.red_team:
         from core.red_team import run_red_team_simulation
@@ -283,4 +283,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(monitor_system())
     except KeyboardInterrupt:
-        logger.info("LogDefender shut down.")
+        logger.info("HookShield shut down.")

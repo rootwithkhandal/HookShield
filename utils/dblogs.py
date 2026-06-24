@@ -8,19 +8,34 @@ import sqlite3
 import os
 from datetime import datetime
 from utils.config_loader import load_config
-try:
-    from utils.syslog_exporter import SyslogSender
-except ImportError:
-    SyslogSender = None
+import logging
+from logging.handlers import SysLogHandler
+import json
 
 _cfg = load_config()
 OUTPUT_MODE = _cfg.get("output_mode", "sqlite").lower()
 SYSLOG_HOST = _cfg.get("syslog_host", "127.0.0.1")
 SYSLOG_PORT = int(_cfg.get("syslog_port", 514))
 
-_syslog_sender = None
-if OUTPUT_MODE in ["syslog", "both"] and SyslogSender:
-    _syslog_sender = SyslogSender(SYSLOG_HOST, SYSLOG_PORT)
+_syslog_logger = None
+if OUTPUT_MODE in ["syslog", "both"]:
+    _syslog_logger = logging.getLogger('HS_Syslog')
+    _syslog_logger.setLevel(logging.INFO)
+    try:
+        handler = SysLogHandler(address=(SYSLOG_HOST, SYSLOG_PORT))
+        handler.setFormatter(logging.Formatter('%(message)s'))
+        _syslog_logger.addHandler(handler)
+    except Exception as e:
+        print(f"Failed to init syslog: {e}")
+        _syslog_logger = None
+
+def _send_syslog(level, tag, data):
+    if not _syslog_logger: return
+    msg = f"[{tag}] {json.dumps(data)}"
+    lvl = level.upper()
+    if lvl in ["ERROR", "HIGH"]: _syslog_logger.error(msg)
+    elif lvl in ["WARN", "MEDIUM"]: _syslog_logger.warning(msg)
+    else: _syslog_logger.info(msg)
 
 # Resolve DB path relative to project root so it works from any cwd
 _DB_PATH = os.path.join(os.path.dirname(__file__), "..", "logs.db")
@@ -89,8 +104,7 @@ def insert_log(level: str, log_message: str, location: str):
         conn.commit()
         conn.close()
 
-    if _syslog_sender:
-        _syslog_sender.send(level, "HS_LOG", {"message": log_message, "location": str(location)})
+    _send_syslog(level, "HS_LOG", {"message": log_message, "location": str(location)})
 
 
 def db_network_ip(level: str, message: str, source_ip: str):
@@ -106,8 +120,7 @@ def db_network_ip(level: str, message: str, source_ip: str):
         conn.commit()
         conn.close()
 
-    if _syslog_sender:
-        _syslog_sender.send(level, "HS_NET", {"message": message, "source_ip": source_ip})
+    _send_syslog(level, "HS_NET", {"message": message, "source_ip": source_ip})
 
 
 def insert_threat(threat_type: str, severity: str, description: str):
@@ -123,8 +136,7 @@ def insert_threat(threat_type: str, severity: str, description: str):
         conn.commit()
         conn.close()
 
-    if _syslog_sender:
-        _syslog_sender.send(severity, "HS_THREAT", {"threat_type": threat_type, "severity": severity, "description": description})
+    _send_syslog(severity, "HS_THREAT", {"threat_type": threat_type, "severity": severity, "description": description})
 
 
 def mark_threat_resolved(threat_id: int):

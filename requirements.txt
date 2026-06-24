@@ -1,4 +1,4 @@
-# LogDefender dependencies
+# HookShield dependencies
 # Install with: pip install -r requirements.txt
 
 # Core detection

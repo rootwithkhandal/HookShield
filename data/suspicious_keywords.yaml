@@ -1,4 +1,4 @@
-# Suspicious process/command-line keywords used by LogDefender.
+# Suspicious process/command-line keywords used by HookShield.
 # Add or remove entries to tune detection sensitivity.
 # Lines starting with '#' are comments and are ignored.
 

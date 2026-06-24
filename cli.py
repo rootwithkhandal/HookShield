@@ -1,5 +1,5 @@
 """
-LogDefender CLI entry point.
+HookShield CLI entry point.
 
 Usage:
     python cli.py                          # one-shot scan (current directory)
@@ -17,7 +17,7 @@ from main import detect_keyloggers, scanning_files, detect_network, monitor_syst
 def run_once(directory: str):
     """Run a single detection pass and print a summary."""
     print("=" * 60)
-    print("LogDefender — single scan")
+    print("HookShield — single scan")
     print("=" * 60)
 
     processes = detect_keyloggers()
@@ -39,7 +39,7 @@ def run_once(directory: str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="LogDefender — keylogger detection tool",
+        description="HookShield — keylogger detection tool",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
