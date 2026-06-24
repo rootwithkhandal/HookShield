@@ -38,13 +38,13 @@ def detect_keyloggers() -> list[dict]:
     if processes:
         insert_log("WARN", "Suspicious processes detected.", str(processes))
         insert_threat("process", "HIGH", f"Suspicious processes: {[p['name'] for p in processes]}")
-        _send_process_alert(processes)
+        send_alert("Process", processes, "Terminate the process.")
 
     logger.info("--- Keyboard hook check ---")
     if detect_keyboard_hooks():
         insert_log("WARN", "Keyboard hook detected.", "N/A")
         insert_threat("keyboard_hook", "HIGH", "Active keyboard hook detected.")
-        _send_hook_alert(processes)
+        send_alert("Keyboard Hook", processes, "Terminate the process.")
 
     return processes
 
@@ -58,7 +58,7 @@ def scanning_files(directory_path: str) -> tuple[list[str], str]:
         logger.warning("Suspicious files detected: %s", suspicious_files)
         insert_log("WARN", "Suspicious files detected.", str(suspicious_files))
         insert_threat("file", "HIGH", f"Suspicious files: {suspicious_files}")
-        _send_file_alert(suspicious_files)
+        send_alert("File", suspicious_files, "Quarantine the file.")
     else:
         logger.info("No suspicious files found in %s", directory_path)
 
@@ -73,7 +73,7 @@ def detect_network(processes: list = None, files: list = None) -> list[dict]:
     if connections:
         insert_log("WARN", "Suspicious remote connections detected.", str(connections))
         insert_threat("network", "MEDIUM", f"Suspicious connections: {connections}")
-        _send_network_alert(connections)
+        send_alert("Remote Connection", connections, "Block IP.")
 
     if not (processes or files or connections or detect_keyboard_hooks()):
         logger.info("No keylogger activity detected.")
@@ -89,7 +89,7 @@ def detect_clipboard() -> list[dict]:
     if hits:
         insert_log("WARN", "Suspicious clipboard access detected.", str(hits))
         insert_threat("clipboard", "MEDIUM", f"Clipboard access by: {[h['name'] for h in hits]}")
-        _send_clipboard_alert(hits)
+        send_alert("Clipboard Access", hits, "Investigate process.")
 
     return hits
 
@@ -102,7 +102,7 @@ def scan_startup() -> list[dict]:
     if entries:
         insert_log("WARN", "Suspicious startup entries detected.", str(entries))
         insert_threat("startup", "HIGH", f"Suspicious startup entries: {entries}")
-        _send_startup_alert(entries)
+        send_alert("Startup Entry", entries, "Remove entry.")
 
     return entries
 
@@ -140,75 +140,11 @@ def kill_process(pid: int) -> bool:
 # Alert helpers
 # ---------------------------------------------------------------------------
 
-def _send_process_alert(processes: list):
-    subject = "🚨 SCRAMBLE — Suspicious Process Detected"
-    body = (
-        "🚨 Threat Alert: Suspicious Process Detected\n\n"
-        "Details:\n---------\n"
-        f"Processes : {processes}\n"
-        "Action    : Terminate the process and perform a full system scan.\n\n"
-        "This is an automated alert from LogDefender."
-    )
-    send_email(subject=subject, body=body)
-
-
-def _send_hook_alert(processes: list):
-    subject = "🚨 SCRAMBLE — Keyboard Hook Detected"
-    body = (
-        "🚨 Threat Alert: Keyboard Hook Detected\n\n"
-        "Details:\n---------\n"
-        f"Related processes : {processes}\n"
-        "Action            : Terminate the process and perform a full system scan.\n\n"
-        "This is an automated alert from LogDefender."
-    )
-    send_email(subject=subject, body=body)
-
-
-def _send_file_alert(files: list):
-    subject = "🚨 SCRAMBLE — Suspicious File Detected"
-    body = (
-        "🚨 Threat Alert: Suspicious File Detected\n\n"
-        "Details:\n---------\n"
-        f"Files  : {files}\n"
-        "Action : Quarantine or delete the file and perform a full system scan.\n\n"
-        "This is an automated alert from LogDefender."
-    )
-    send_email(subject=subject, body=body)
-
-
-def _send_network_alert(connections: list):
-    subject = "🚨 SCRAMBLE — Suspicious Remote Connection Detected"
-    body = (
-        "🚨 Threat Alert: Suspicious Remote Connection Detected\n\n"
-        "Details:\n---------\n"
-        f"Connections : {connections}\n\n"
-        "This is an automated alert from LogDefender."
-    )
-    send_email(subject=subject, body=body)
-
-
-def _send_clipboard_alert(hits: list):
-    subject = "🚨 SCRAMBLE — Suspicious Clipboard Access Detected"
-    body = (
-        "🚨 Threat Alert: Suspicious Clipboard Access\n\n"
-        "Details:\n---------\n"
-        f"Processes : {hits}\n"
-        "Action    : Investigate and terminate the process if malicious.\n\n"
-        "This is an automated alert from LogDefender."
-    )
-    send_email(subject=subject, body=body)
-
-
-def _send_startup_alert(entries: list):
-    subject = "🚨 SCRAMBLE — Suspicious Startup Entry Detected"
-    body = (
-        "🚨 Threat Alert: Suspicious Startup Entry\n\n"
-        "Details:\n---------\n"
-        f"Entries : {entries}\n"
-        "Action  : Remove the entry and investigate the associated file.\n\n"
-        "This is an automated alert from LogDefender."
-    )
-    send_email(subject=subject, body=body)
+def send_alert(alert_type: str, details, action: str = ""):
+    # ponytail: one unified alert function
+    body = f"🚨 Threat Alert: Suspicious {alert_type} Detected\n\nDetails:\n---------\n{details}\n"
+    if action: body += f"Action: {action}\n\n"
+    send_email(f"🚨 SCRAMBLE — Suspicious {alert_type} Detected", body + "This is an automated alert from LogDefender.")
 
 
 # ---------------------------------------------------------------------------

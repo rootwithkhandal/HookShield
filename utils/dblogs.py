@@ -109,142 +109,18 @@ def mark_threat_resolved(threat_id: int):
     conn.close()
 
 
-# ---------------------------------------------------------------------------
-# Read helpers
-# ---------------------------------------------------------------------------
-
 def fetch_all_logs() -> list:
-    """Return all general log rows as a list of dicts."""
-    conn = sqlite3.connect(_get_db_path())
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute("SELECT * FROM logs ORDER BY id DESC").fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
+    return sqlite3.connect(_get_db_path()).execute("SELECT * FROM logs ORDER BY id DESC").fetchall()
 
 def fetch_all_network_logs() -> list:
-    """Return all network IP log rows as a list of dicts."""
-    conn = sqlite3.connect(_get_db_path())
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute("SELECT * FROM network_ip ORDER BY id DESC").fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
+    return sqlite3.connect(_get_db_path()).execute("SELECT * FROM network_ip ORDER BY id DESC").fetchall()
 
 def fetch_suspicious_ips() -> list:
-    """Return all tracked suspicious IP addresses."""
-    conn = sqlite3.connect(_get_db_path())
-    rows = conn.execute("SELECT DISTINCT source_ip FROM network_ip").fetchall()
-    conn.close()
-    return [row[0] for row in rows]
-
+    return [r[0] for r in sqlite3.connect(_get_db_path()).execute("SELECT DISTINCT source_ip FROM network_ip").fetchall()]
 
 def fetch_threat_history(resolved: bool | None = None) -> list:
-    """
-    Return threat history rows.
-    Pass resolved=True/False to filter, or None for all rows.
-    """
-    conn = sqlite3.connect(_get_db_path())
-    conn.row_factory = sqlite3.Row
-    if resolved is None:
-        rows = conn.execute(
-            "SELECT * FROM threat_history ORDER BY id DESC"
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT * FROM threat_history WHERE resolved = ? ORDER BY id DESC",
-            (1 if resolved else 0,),
-        ).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-
-def get_threat_stats() -> dict:
-    """
-    Return aggregate threat statistics.
-
-    Keys: total, by_type {type: count}, by_severity {severity: count},
-          unresolved, last_threat_at
-    """
-    conn = sqlite3.connect(_get_db_path())
-    rows = conn.execute("SELECT * FROM threat_history").fetchall()
-    conn.close()
-
-    if not rows:
-        return {
-            "total": 0,
-            "by_type": {},
-            "by_severity": {},
-            "unresolved": 0,
-            "last_threat_at": None,
-        }
-
-    by_type: dict[str, int] = {}
-    by_severity: dict[str, int] = {}
-    unresolved = 0
-    last_ts = None
-
-    for row in rows:
-        t = row[2]   # threat_type
-        s = row[3]   # severity
-        resolved = row[5]
-        ts = row[1]  # timestamp
-
-        by_type[t] = by_type.get(t, 0) + 1
-        by_severity[s] = by_severity.get(s, 0) + 1
-        if not resolved:
-            unresolved += 1
-        if last_ts is None or ts > last_ts:
-            last_ts = ts
-
-    return {
-        "total": len(rows),
-        "by_type": by_type,
-        "by_severity": by_severity,
-        "unresolved": unresolved,
-        "last_threat_at": last_ts,
-    }
-
-
-# ---------------------------------------------------------------------------
-# Export helpers
-# ---------------------------------------------------------------------------
-
-def export_logs_csv(include_network: bool = True) -> str:
-    """
-    Export all logs (and optionally network logs) to a CSV string.
-    Returns the CSV content as a string.
-    """
-    output = io.StringIO()
-    writer = csv.writer(output)
-
-    # General logs
-    writer.writerow(["=== Detection Logs ==="])
-    writer.writerow(["id", "timestamp", "level", "message", "location"])
-    for row in fetch_all_logs():
-        writer.writerow([row["id"], row["timestamp"], row["level"], row["message"], row["location"]])
-
-    if include_network:
-        writer.writerow([])
-        writer.writerow(["=== Network / IP Logs ==="])
-        writer.writerow(["id", "timestamp", "level", "message", "source_ip"])
-        for row in fetch_all_network_logs():
-            writer.writerow([row["id"], row["timestamp"], row["level"], row["message"], row["source_ip"]])
-
-    return output.getvalue()
-
-
-def export_threats_csv() -> str:
-    """Export threat history to a CSV string."""
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["id", "timestamp", "threat_type", "severity", "description", "resolved"])
-    for row in fetch_threat_history():
-        writer.writerow([
-            row["id"], row["timestamp"], row["threat_type"],
-            row["severity"], row["description"], bool(row["resolved"]),
-        ])
-    return output.getvalue()
+    q = "SELECT * FROM threat_history" + ("" if resolved is None else f" WHERE resolved = {1 if resolved else 0}") + " ORDER BY id DESC"
+    return sqlite3.connect(_get_db_path()).execute(q).fetchall()
 
 
 # Initialise tables on import

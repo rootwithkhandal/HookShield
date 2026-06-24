@@ -11,11 +11,9 @@ import streamlit as st
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.dblogs import (
-    fetch_all_logs, fetch_all_network_logs,
-    fetch_threat_history, get_threat_stats,
-    export_logs_csv, export_threats_csv,
-)
+import sqlite3
+db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "logs.db"))
+def get_db(): return sqlite3.connect(db_path)
 
 st.set_page_config(page_title="LogDefender", page_icon="🛡️", layout="wide")
 
@@ -37,13 +35,13 @@ severity_filter = st.sidebar.multiselect(
 )
 
 st.sidebar.divider()
-if st.sidebar.button("📥 Export Logs CSV"):
-    csv = export_logs_csv()
-    st.sidebar.download_button("Download", csv, file_name="logdefender_logs.csv", mime="text/csv")
-
-if st.sidebar.button("📥 Export Threats CSV"):
-    csv = export_threats_csv()
-    st.sidebar.download_button("Download", csv, file_name="logdefender_threats.csv", mime="text/csv")
+try:
+    logs_csv = pd.read_sql("SELECT * FROM logs", get_db()).to_csv(index=False)
+    st.sidebar.download_button("📥 Export Logs CSV", logs_csv, "logs.csv", "text/csv")
+    threats_csv = pd.read_sql("SELECT * FROM threat_history", get_db()).to_csv(index=False)
+    st.sidebar.download_button("📥 Export Threats CSV", threats_csv, "threats.csv", "text/csv")
+except Exception:
+    st.sidebar.caption("No logs to export.")
 
 # ---------------------------------------------------------------------------
 # Overview page
@@ -51,41 +49,28 @@ if st.sidebar.button("📥 Export Threats CSV"):
 if page == "Overview":
     st.title("🛡️ LogDefender — Overview")
 
-    stats = get_threat_stats()
+    try: df_t = pd.read_sql("SELECT * FROM threat_history", get_db())
+    except: df_t = pd.DataFrame()
 
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Total Threats",  stats["total"])
-    c2.metric("Unresolved",     stats["unresolved"])
-    c3.metric("Process Threats", stats["by_type"].get("process", 0))
-    c4.metric("File Threats",    stats["by_type"].get("file", 0))
-    c5.metric("Network Threats", stats["by_type"].get("network", 0))
+    c1.metric("Total Threats", len(df_t))
+    c2.metric("Unresolved", len(df_t[df_t['resolved'] == 0]) if len(df_t) else 0)
+    c3.metric("Process Threats", len(df_t[df_t['threat_type'] == 'process']) if len(df_t) else 0)
+    c4.metric("File Threats", len(df_t[df_t['threat_type'] == 'file']) if len(df_t) else 0)
+    c5.metric("Network Threats", len(df_t[df_t['threat_type'] == 'network']) if len(df_t) else 0)
 
     st.divider()
-
     col_left, col_right = st.columns(2)
-
     with col_left:
         st.subheader("Threats by Type")
-        if stats["by_type"]:
-            df_type = pd.DataFrame(
-                list(stats["by_type"].items()), columns=["Type", "Count"]
-            ).set_index("Type")
-            st.bar_chart(df_type)
-        else:
-            st.info("No threat data yet.")
-
+        if len(df_t): st.bar_chart(df_t['threat_type'].value_counts())
+        else: st.info("No threat data yet.")
     with col_right:
         st.subheader("Threats by Severity")
-        if stats["by_severity"]:
-            df_sev = pd.DataFrame(
-                list(stats["by_severity"].items()), columns=["Severity", "Count"]
-            ).set_index("Severity")
-            st.bar_chart(df_sev)
-        else:
-            st.info("No threat data yet.")
+        if len(df_t): st.bar_chart(df_t['severity'].value_counts())
+        else: st.info("No threat data yet.")
 
-    if stats["last_threat_at"]:
-        st.caption(f"Last threat detected: {stats['last_threat_at']}")
+    if len(df_t): st.caption(f"Last threat detected: {df_t['timestamp'].max()}")
 
 # ---------------------------------------------------------------------------
 # Detection Logs page
@@ -93,9 +78,9 @@ if page == "Overview":
 elif page == "Detection Logs":
     st.title("📋 Detection Logs")
 
-    logs = fetch_all_logs()
-    if logs:
-        df = pd.DataFrame(logs)
+    try: df = pd.read_sql("SELECT * FROM logs ORDER BY id DESC", get_db())
+    except: df = pd.DataFrame()
+    if len(df):
         if severity_filter:
             df = df[df["level"].isin(severity_filter)]
 
@@ -127,9 +112,15 @@ elif page == "Detection Logs":
 elif page == "Network Logs":
     st.title("🌐 Network / IP Logs")
 
-    net_logs = fetch_all_network_logs()
-    if net_logs:
-        df_net = pd.DataFrame(net_logs)
+    if ip := st.text_input("Flag Suspicious IP"):
+        if st.button("Add"):
+            with get_db() as db:
+                db.execute("INSERT INTO network_ip (timestamp, level, message, source_ip) VALUES (datetime('now', 'localtime'), 'WARN', 'Manually added.', ?)", (ip,))
+            st.success(f"Flagged {ip}")
+
+    try: df_net = pd.read_sql("SELECT * FROM network_ip ORDER BY id DESC", get_db())
+    except: df_net = pd.DataFrame()
+    if len(df_net):
         if severity_filter:
             df_net = df_net[df_net["level"].isin(severity_filter)]
         st.dataframe(df_net, use_container_width=True, height=400)
@@ -151,10 +142,12 @@ elif page == "Threat History":
     st.title("🔴 Threat History")
 
     show_resolved = st.checkbox("Show resolved threats", value=False)
-    threats = fetch_threat_history(resolved=None if show_resolved else False)
+    try:
+        q = "SELECT * FROM threat_history" + ("" if show_resolved else " WHERE resolved=0") + " ORDER BY id DESC"
+        df_t = pd.read_sql(q, get_db())
+    except: df_t = pd.DataFrame()
 
-    if threats:
-        df_t = pd.DataFrame(threats)
+    if len(df_t):
 
         def _threat_highlight(row):
             colour_map = {"HIGH": "#ff4b4b", "MEDIUM": "#ffa500", "LOW": "#2ecc71"}
