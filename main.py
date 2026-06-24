@@ -19,6 +19,7 @@ from core.remote_connection_detector import detect_remote_connections
 from core.clipboard_monitor import detect_clipboard_access
 from core.memory_scanner import detect_dll_injection
 from core.etw_consumer import start_etw_listeners, get_next_etw_event
+from core.scoring_engine import BehavioralScorer
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,17 @@ logger = logging.getLogger(__name__)
 _cfg = load_config()
 VIRUS_TOTAL_API_KEY: str = _cfg.get("virus_total_api_key", "")
 KNOWN_HASHES: list = load_known_hashes()
+
+scorer = BehavioralScorer(threshold=80, window_seconds=300)
+
+def _trigger_aggregate_alert(pid: int, name: str):
+    summary = scorer.get_summary(pid)
+    if not summary: return
+    details = f"Process {name} (PID: {pid}) breached behavioral threshold!\nScore: {summary.get('score', 0)}/100\nEvents: {summary.get('events', [])}"
+    insert_threat("behavioral", "CRITICAL", details)
+    send_alert("Behavioral Threshold Breached", details, "Auto-terminating process.")
+    if pid > 0:
+        kill_process(pid)
 
 
 # ---------------------------------------------------------------------------
@@ -39,14 +51,15 @@ def detect_keyloggers() -> list[dict]:
 
     if processes:
         insert_log("WARN", "Suspicious processes detected.", str(processes))
-        insert_threat("process", "HIGH", f"Suspicious processes: {[p['name'] for p in processes]}")
-        send_alert("Process", processes, "Terminate the process.")
+        for p in processes:
+            if scorer.add_event(p['pid'], p['name'], "Suspicious Process", 30):
+                _trigger_aggregate_alert(p['pid'], p['name'])
 
     logger.info("--- Keyboard hook check ---")
     if detect_keyboard_hooks():
         insert_log("WARN", "Keyboard hook detected.", "N/A")
-        insert_threat("keyboard_hook", "HIGH", "Active keyboard hook detected.")
-        send_alert("Keyboard Hook", processes, "Terminate the process.")
+        if scorer.add_event(0, "System", "Global Keyboard Hook", 50):
+            _trigger_aggregate_alert(0, "System")
 
     return processes
 
@@ -74,8 +87,11 @@ def detect_network(processes: list = None, files: list = None) -> list[dict]:
 
     if connections:
         insert_log("WARN", "Suspicious remote connections detected.", str(connections))
-        insert_threat("network", "MEDIUM", f"Suspicious connections: {connections}")
-        send_alert("Remote Connection", connections, "Block IP.")
+        for c in connections:
+            pid = c.get('pid', 0)
+            name = c.get('name', 'Unknown')
+            if scorer.add_event(pid, name, "Network Connection", 40):
+                _trigger_aggregate_alert(pid, name)
 
     if not (processes or files or connections or detect_keyboard_hooks()):
         logger.info("No keylogger activity detected.")
@@ -90,8 +106,11 @@ def detect_clipboard() -> list[dict]:
 
     if hits:
         insert_log("WARN", "Suspicious clipboard access detected.", str(hits))
-        insert_threat("clipboard", "MEDIUM", f"Clipboard access by: {[h['name'] for h in hits]}")
-        send_alert("Clipboard Access", hits, "Investigate process.")
+        for h in hits:
+            pid = h.get('pid', 0)
+            name = h.get('name', 'Unknown')
+            if scorer.add_event(pid, name, "Clipboard Access", 20):
+                _trigger_aggregate_alert(pid, name)
 
     return hits
 
@@ -108,8 +127,11 @@ def detect_memory_injection() -> list[dict]:
 
     if hits:
         insert_log("WARN", "Memory injection detected.", str(hits))
-        insert_threat("memory", "HIGH", f"Injected into: {[h['name'] for h in hits]}")
-        send_alert("Memory Injection", hits, "Investigate process immediately.")
+        for h in hits:
+            pid = h.get('pid', 0)
+            name = h.get('name', 'Unknown')
+            if scorer.add_event(pid, name, "Memory Injection", 80):
+                _trigger_aggregate_alert(pid, name)
 
     return hits
 
@@ -160,6 +182,7 @@ def send_alert(alert_type: str, details, action: str = ""):
 
 async def route_etw_events():
     """Consume events from the ETW queue and route them."""
+    import re
     async for event in get_next_etw_event():
         try:
             event_str = str(event).lower()
@@ -167,11 +190,14 @@ async def route_etw_events():
             # Simple keyword-based event routing since `etw` dict structures vary
             if 'registry' in event_str and ('\\run' in event_str or 'runonce' in event_str):
                 insert_log("WARN", "ETW: Suspicious Registry Run Key modified", event_str[:200])
-                insert_threat("startup", "HIGH", "Registry RUN key modified (ETW)")
-                send_alert("Registry Startup", event_str[:200], "Check registry RUN keys immediately.")
+                
+                m = re.search(r"pid['\"]?\s*:\s*(\d+)", event_str)
+                pid = int(m.group(1)) if m else 0
+                
+                if scorer.add_event(pid, f"ETW_PID_{pid}", "Registry Write (ETW)", 20):
+                    _trigger_aggregate_alert(pid, f"ETW_PID_{pid}")
                 
             elif 'process' in event_str and 'create' in event_str:
-                # Here we could trigger a targeted VT check on the new process executable.
                 insert_log("INFO", "ETW: Process Created", event_str[:150])
                 
         except Exception as e:
